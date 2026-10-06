@@ -1,0 +1,19 @@
+# ─── Aerial Saver configuration ───────────────────────────────
+# All times are in SECONDS.
+
+SAVER_AFTER=300        # idle before the video starts
+LOCK_AFTER=900         # idle before the screen locks   (0 = never lock)
+DPMS_AFTER=1500        # idle before monitors power off (0 = never)
+
+VIDEOS="$HOME/Videos/Screensaver-SDR"   # folder holding your video files
+EXTENSIONS="mov mp4 m4v"                # file types to include
+
+# ── Display ───────────────────────────────────────────────────
+GEOMETRY="auto"        # "auto" = span the whole virtual desktop (any layout)
+MIN_MONITORS=1         # set to 4 to run only on the full quad-monitor setup
+
+# Extra mpv options
+MPV_EXTRA="--hwdec=auto-safe --profile=gpu-hq"
+
+HIDE_PANEL="yes"       # hide the Cinnamon panel while the video plays
+POLL=2                 # idle-check interval (seconds)
