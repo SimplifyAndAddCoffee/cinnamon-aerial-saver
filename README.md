@@ -57,7 +57,7 @@ resolution, and no drift between monitors.
 
 ```bash
 git clone https://github.com/SimplifyAndAddCoffee/cinnamon-aerial-saver.git
-cd aerial-saver
+cd cinnamon-aerial-saver
 ./install.sh
 ```
 
