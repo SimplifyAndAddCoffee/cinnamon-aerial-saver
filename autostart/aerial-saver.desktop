@@ -1,0 +1,7 @@
+[Desktop Entry]
+Type=Application
+Name=Aerial Saver
+Comment=Apple Aerials video screensaver, single window across all monitors
+Exec=@EXEC@
+Terminal=false
+X-GNOME-Autostart-enabled=true
