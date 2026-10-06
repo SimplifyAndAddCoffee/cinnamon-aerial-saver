@@ -1,0 +1,126 @@
+#!/usr/bin/env bash
+# cinnamon-aerial-saver — one mpv window spanning all monitors, driven by idle time.
+# https://github.com/SimplifyAndAddCoffee/cinnamon-aerial-saver
+
+set -u
+CONFIG="${XDG_CONFIG_HOME:-$HOME/.config}/aerial-saver/config"
+[ -r "$CONFIG" ] && . "$CONFIG"
+
+# Fallbacks if the config is missing a key
+: "${SAVER_AFTER:=300}"; : "${LOCK_AFTER:=900}"; : "${DPMS_AFTER:=1500}"
+: "${VIDEOS:=$HOME/Videos/Screensaver-SDR}"; : "${EXTENSIONS:=mov mp4 m4v}"
+: "${GEOMETRY:=auto}"; : "${MIN_MONITORS:=1}"
+: "${MPV_EXTRA:=--hwdec=auto-safe --profile=gpu-hq}"
+: "${HIDE_PANEL:=yes}"; : "${POLL:=2}"
+
+RUNDIR="${XDG_RUNTIME_DIR:-/tmp}/aerial-saver"
+mkdir -p "$RUNDIR"
+PLAYLIST="$RUNDIR/playlist.txt"
+PANEL_BAK="$RUNDIR/panel-autohide.bak"
+LOG="$RUNDIR/aerial-saver.log"
+MPV_PID=""
+STATE=0                       # 0 idle | 1 video | 2 locked | 3 dpms-off
+
+log() { printf '%s %s\n' "$(date '+%F %T')" "$*" >>"$LOG"; }
+
+# ── display detection ──────────────────────────────────────────
+detect_geometry() {
+    case "$GEOMETRY" in
+        auto|"")
+            local dim
+            dim=$(xdpyinfo 2>/dev/null | awk '/dimensions:/ {print $2; exit}')
+            [ -n "$dim" ] || dim="1920x1080"
+            printf '%s+0+0' "$dim"
+            ;;
+        *) printf '%s' "$GEOMETRY" ;;
+    esac
+}
+
+active_monitors() {
+    xrandr --listactivemonitors 2>/dev/null | tail -n +2 | grep -c . || echo 0
+}
+
+build_playlist() {
+    : >"$PLAYLIST"
+    local ext
+    for ext in $EXTENSIONS; do
+        find "$VIDEOS" -maxdepth 1 -type f -iname "*.$ext" >>"$PLAYLIST"
+    done
+}
+
+# ── panel hiding (community workaround) ────────────────────────
+panel_hide() {
+    [ "$HIDE_PANEL" = "yes" ] || return 0
+    [ -f "$PANEL_BAK" ] && return 0
+    gsettings get org.cinnamon panels-autohide >"$PANEL_BAK" 2>/dev/null || return 0
+    local hidden
+    hidden="[$(gsettings get org.cinnamon panels-enabled 2>/dev/null \
+        | grep -oE '[0-9]+:' | tr -d ':' \
+        | sed "s/.*/'&:true'/" | paste -sd, -)]"
+    gsettings set org.cinnamon panels-autohide "$hidden" 2>/dev/null
+    log "panel hidden -> $hidden"
+}
+panel_restore() {
+    [ -f "$PANEL_BAK" ] || return 0
+    gsettings set org.cinnamon panels-autohide "$(cat "$PANEL_BAK")" 2>/dev/null
+    rm -f "$PANEL_BAK"; log "panel restored"
+}
+
+# ── video ──────────────────────────────────────────────────────
+start_video() {
+    local nmons geom
+    nmons=$(active_monitors)
+    if [ "$nmons" -lt "$MIN_MONITORS" ]; then
+        log "only $nmons monitor(s) active (< MIN_MONITORS=$MIN_MONITORS) — video skipped"
+        return 1
+    fi
+    geom=$(detect_geometry)
+    build_playlist
+    [ -s "$PLAYLIST" ] || { log "no videos found in $VIDEOS"; return 1; }
+    panel_hide
+    # shellcheck disable=SC2086
+    mpv --really-quiet --no-audio --no-osc --no-input-default-bindings \
+        --cursor-autohide=always --stop-screensaver=no \
+        --loop-playlist=inf --shuffle \
+        --no-border --ontop --geometry="$geom" \
+        $MPV_EXTRA --playlist="$PLAYLIST" >>"$LOG" 2>&1 &
+    MPV_PID=$!
+    log "video started (pid $MPV_PID, $nmons monitor(s), geometry=$geom)"
+}
+stop_video() {
+    if [ -n "$MPV_PID" ] && kill -0 "$MPV_PID" 2>/dev/null; then
+        kill "$MPV_PID" 2>/dev/null; wait "$MPV_PID" 2>/dev/null
+    fi
+    MPV_PID=""; panel_restore
+}
+cleanup() { stop_video; exit 0; }
+trap cleanup INT TERM HUP
+
+command -v xprintidle >/dev/null || { log "xprintidle missing"; exit 1; }
+log "started (saver=${SAVER_AFTER}s lock=${LOCK_AFTER}s dpms=${DPMS_AFTER}s)"
+
+while sleep "$POLL"; do
+    idle=$(( $(xprintidle 2>/dev/null || echo 0) / 1000 ))
+
+    if [ "$idle" -lt "$SAVER_AFTER" ]; then
+        [ "$STATE" -ne 0 ] && { stop_video; STATE=0; log "activity: reset"; }
+        continue
+    fi
+
+    if [ "$STATE" -eq 0 ]; then
+        start_video && STATE=1
+    elif [ "$STATE" -eq 1 ] && ! kill -0 "$MPV_PID" 2>/dev/null; then
+        start_video
+    fi
+
+    if [ "$LOCK_AFTER" -gt 0 ] && [ "$STATE" -eq 1 ] && [ "$idle" -ge "$LOCK_AFTER" ]; then
+        stop_video
+        cinnamon-screensaver-command -l >>"$LOG" 2>&1
+        STATE=2; log "locked"
+    fi
+
+    if [ "$DPMS_AFTER" -gt 0 ] && [ "$STATE" -lt 3 ] && [ "$idle" -ge "$DPMS_AFTER" ]; then
+        xset dpms force off >>"$LOG" 2>&1
+        STATE=3; log "dpms off"
+    fi
+done
