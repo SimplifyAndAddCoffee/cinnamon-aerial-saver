@@ -5,7 +5,20 @@ An Apple-TV-style **Aerial** video screensaver for Linux Mint / Cinnamon that pl
 with independently configurable video, lock, and display-off timers.
 
 ![platform](https://img.shields.io/badge/platform-Linux%20Mint%20%2F%20Cinnamon-blue)
-![license](https://img.shields.io/badge/license-GPLv3-blue)
+![license](https://img.shields.io/badge/license-VibeCoded%20AI--Slop%20v1.0-purple)
+
+![AI slop](https://img.shields.io/badge/AI%20slop-100%25-red)
+
+![quality](https://img.shields.io/badge/quality-none%20whatsoever-lightgrey)
+
+> [!CAUTION]
+> **AI-generated slop — do not use.** This exists as a personal workaround, not as
+> software. Read it for ideas if you like; do not expect it to work, be maintained,
+> or be correct. Any resemblance to functioning software is coincidental.
+>
+> **The smart thing to do is never to use it for any reason.** It is published only
+> because it works on exactly one computer and that computer belongs to the author.
+> If you run it and something breaks, that is the expected outcome.
 
 ---
 
